@@ -1,6 +1,6 @@
 # claude-code-mods
 
-Claude Code mods by Team Brilliant — function-hook plugins that change how Claude Code looks and behaves. Early-access API; Claude Code only.
+Claude Code mods by Team Brilliant. A mod is a plugin that hooks into Claude Code's events and UI: it can draw a pane, rewrite how a message renders, or react to tool calls. The mods API is early access, and mods run in Claude Code only.
 
 ## Install
 
@@ -8,15 +8,15 @@ Claude Code mods by Team Brilliant — function-hook plugins that change how Cla
 /plugin install thoughts@teambrilliant-marketplace
 ```
 
-(`/plugin marketplace add teambrilliant/marketplace` first if you haven't.)
+Run `/plugin marketplace add teambrilliant/marketplace` first if you haven't added the marketplace.
 
 ## Mods
 
 | Mod | What it does |
 | --- | --- |
-| [`thoughts`](mods/thoughts) | A side pane into the work: the active `thoughts/plans/` plan as a progress card backed by real check runs, plus the session's ★ views pinned until `/clear`. `/thoughts` opens it. Pairs with [dev-skills](https://github.com/teambrilliant/dev-skills). |
+| [`thoughts`](mods/thoughts) | Side pane with the active `thoughts/plans/` plan as a progress card, each tick checked against the commands that actually ran, plus the session's ★ views pinned until `/clear`. `/thoughts` opens it. Works with [dev-skills](https://github.com/teambrilliant/dev-skills). |
 
-Skills feed mods through [CONTRACTS.md](CONTRACTS.md).
+[CONTRACTS.md](CONTRACTS.md) lists what skills must emit for mods to read.
 
 ## Develop
 
@@ -25,4 +25,4 @@ Skills feed mods through [CONTRACTS.md](CONTRACTS.md).
 ~/.local/bin/claude plugin test mods/<name>
 ```
 
-See [CLAUDE.md](CLAUDE.md).
+The full loop is in [CLAUDE.md](CLAUDE.md).

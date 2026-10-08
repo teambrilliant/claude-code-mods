@@ -1,10 +1,10 @@
 # Contracts
 
-What skills emit so mods can read it. Skills keep these when edited; mods parse only what's here.
+What skills emit so mods can read it. Skills keep these formats when edited, and mods parse only what's listed here.
 
 ## ★ views
 
-A view is a block a skill closes its reply with — a summary meant to stay visible.
+A view is the block a skill closes its reply with: a short summary meant to stay visible.
 
 ```
 `★ <Kind> ─────`
@@ -12,10 +12,10 @@ A view is a block a skill closes its reply with — a summary meant to stay visi
 `───── ★`
 ```
 
-- Opener: `★ <Kind> ` then 3+ `─`. Optional surrounding backticks.
-- Closer: a line ending in 3+ `─` then ` ★`. Without it the block is not a view — so a header banner (`★ growth-skills:x ───` … plain `───`) never pins.
-- Keep bars short (5 dashes): long rules wrap in narrow terminals and in Codex.
-- A view about something specific names it after ` · `: `★ Explain · thoughts/plans/x.md ─────`. A file target is watched for changes.
+- Opener: `★ <Kind> ` then 3+ `─`. Backticks around the line are optional.
+- Closer: a line ending in 3+ `─` then ` ★`. A block without one is not a view, so a header banner (`★ growth-skills:x ───` … plain `───`) never pins.
+- Bars stay short (5 dashes), because long rules wrap in narrow terminals and in Codex.
+- A view about one thing names it after ` · `, as in `★ Explain · thoughts/plans/x.md ─────`. When the target is a file, `thoughts` flags the view once the file changes.
 - One slot per `<Kind>`: a newer view of the same kind replaces the older one.
 
 Readers: `thoughts` (pins views in its pane).
@@ -26,4 +26,4 @@ Readers: `thoughts` (pins views in its pane).
 - Every Phase Check item starts with its command in backticks: `` - [ ] `cmd` → expected ``.
 - `execute-plan` ticks `- [x]` right after each check passes, never before.
 
-Readers: `thoughts` (plan card, evidence glyphs matched against Bash runs).
+Readers: `thoughts` (plan card, with evidence glyphs matched against Bash runs).
