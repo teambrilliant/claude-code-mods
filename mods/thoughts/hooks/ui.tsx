@@ -1,8 +1,8 @@
 import type { BoxProps, ButtonProps, ElementConstructor, MarkdownProps, TextProps } from 'claude-code'
 
 import type { ThoughtsPin, ThoughtsRun } from '../types'
-import { ageOf, evidenceSummary, glyphFor, progressGlyph } from './evidence'
-import type { EvidenceSummary, Glyph } from './evidence'
+import { ageOf, evidenceSummary, failStreakOf, glyphFor, isProvenDone, progressGlyph, stripOf } from './evidence'
+import type { EvidenceSummary, Glyph, StripCell } from './evidence'
 import type { Plan, PlanItem, PlanPhase } from './plan'
 import { isPhaseDone, progressOf, shortName } from './plan'
 
@@ -24,7 +24,7 @@ const bodyOf = (pin: ThoughtsPin) => pin.text.split('\n').slice(1, -1)
 
 const headingOf = (pin: ThoughtsPin) => (pin.target === null ? `★ ${pin.kind}` : `★ ${pin.kind} · ${pin.target}`)
 
-export type PinnedActions = { discard: (kind: string) => void; reExplain: (target: string) => void }
+export type PinnedActions = { discard: (kind: string) => void; reExplain: (target: string) => void; toggle: (kind: string) => void }
 
 const FENCE = /^\s*```/u
 
@@ -47,7 +47,26 @@ export function markdownOf(lines: readonly string[]): string {
   return out.join('\n').trim()
 }
 
-/** Newest first, as an open card; older pins follow, newest to oldest, folded to one dim line. */
+/** The first line of prose in a pin's body: fenced blocks and drawing lines skipped, a leading bullet dropped. */
+export function previewOf(pin: ThoughtsPin): string {
+  let isInFence = false
+  for (const line of bodyOf(pin)) {
+    if (FENCE.test(line)) {
+      isInFence = !isInFence
+      continue
+    }
+    if (isInFence || line.trim() === '' || wrapFor(line) !== 'wrap') continue
+    return line.trim().replace(/^[-•]\s*/u, '')
+  }
+  return ''
+}
+
+/** A hand-set fold wins; otherwise the newest pin is open and older ones fold. */
+export function isOpen(pin: ThoughtsPin, isNewest: boolean): boolean {
+  return pin.fold === 'open' || (pin.fold === undefined && isNewest)
+}
+
+/** Newest first; each pin open as a card or folded to one dim line, toggled with ▾/▸. */
 export function PinnedPane({ kit, pins, columns, actions }: { kit: Kit; pins: readonly ThoughtsPin[]; columns: number; actions: PinnedActions }) {
   const { Box, Text, Button, Markdown } = kit
   if (pins.length === 0) return <Text dimColor>  ★ views pin here as they appear</Text>
@@ -62,13 +81,19 @@ export function PinnedPane({ kit, pins, columns, actions }: { kit: Kit; pins: re
       <Button key={`x-${pin.kind}`} label="x" plain dimColor onPress={() => actions.discard(pin.kind)} />
     </Box>
   )
+  const foldButton = (pin: ThoughtsPin, isPinOpen: boolean) => (
+    <Button key={`f-${pin.kind}`} label={isPinOpen ? '▾' : '▸'} plain dimColor={!isPinOpen} onPress={() => actions.toggle(pin.kind)} />
+  )
   return (
     <Box flexDirection="column" gap={1}>
       {newestFirst.map((pin, at) =>
-        at === 0 ? (
+        isOpen(pin, at === 0) ? (
           <Box key={pin.kind} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
             <Box justifyContent="space-between">
-              <Text bold>{clip(headingOf(pin), Math.max(8, columns - 14))}</Text>
+              <Box>
+                {foldButton(pin, true)}
+                <Text bold> {clip(headingOf(pin), Math.max(8, columns - 16))}</Text>
+              </Box>
               {controls(pin)}
             </Box>
             <Box marginTop={1}>
@@ -77,9 +102,13 @@ export function PinnedPane({ kit, pins, columns, actions }: { kit: Kit; pins: re
           </Box>
         ) : (
           <Box key={pin.kind} justifyContent="space-between" paddingX={2}>
-            <Text dimColor wrap="truncate-end">
-              {clip(`▸ ${headingOf(pin)} · ${bodyOf(pin).find(line => line.trim() !== '')?.replace(/^[-•]\s*/u, '') ?? ''}`, Math.max(8, columns - 10))}
-            </Text>
+            <Box>
+              {foldButton(pin, false)}
+              <Text dimColor wrap="truncate-end">
+                {' '}
+                {clip(`${headingOf(pin)} · ${previewOf(pin)}`, Math.max(8, columns - 12))}
+              </Text>
+            </Box>
             {controls(pin)}
           </Box>
         ),
@@ -89,6 +118,11 @@ export function PinnedPane({ kit, pins, columns, actions }: { kit: Kit; pins: re
 }
 
 const GLYPH_COLOR: Partial<Record<Glyph, 'red' | 'yellow'>> = { '✗': 'red', '◌': 'yellow' }
+
+/** Shape carries the meaning, no color: tall = verified now, short = ticked without a fresh run, baseline = open. */
+const STRIP_CHAR: Record<StripCell, string> = { '●': '▌', '✓': '▖', '◌': '▖', '✗': '✗', '○': '▁', gap: '  ' }
+
+const stripText = (cells: readonly StripCell[]) => cells.map(cell => STRIP_CHAR[cell]).join('')
 
 /** `4 of 4 verified` when everything is backed by runs; otherwise each non-zero kind of backing. */
 function summaryParts(summary: EvidenceSummary, done: number, total: number): { text: string; isAlarm: boolean }[] {
@@ -110,14 +144,13 @@ export function PlanPane({ kit, plan, path, columns, evidence }: { kit: Kit; pla
   const lastRun = evidence.ledger.at(-1)
   const glyphOf = (item: PlanItem) => glyphFor(item, evidence.ledger, evidence.editSeq, evidence.baselineTicks)
   const isComplete = progress.done === progress.total && progress.total > 0
-  const summary = summaryParts(
-    evidenceSummary(plan.phases.flatMap(phase => phase.items), evidence.ledger, evidence.editSeq, evidence.baselineTicks),
-    progress.done,
-    progress.total,
-  )
+  const backing = evidenceSummary(plan.phases.flatMap(phase => phase.items), evidence.ledger, evidence.editSeq, evidence.baselineTicks)
+  const summary = summaryParts(backing, progress.done, progress.total)
   const nameOf = (phase: PlanPhase) => phase.name.replace(/^Phase \d+: /u, '')
+  const strip = stripText(stripOf(plan, glyphOf, Math.max(8, columns - 6)))
+  const borderStyle = backing.failing > 0 ? 'bold' : isProvenDone(plan, glyphOf) ? 'double' : 'round'
   return (
-    <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+    <Box key="plan-card" flexDirection="column" borderStyle={borderStyle} borderDimColor={borderStyle === 'round'} paddingX={1}>
       <Box justifyContent="space-between">
         <Text bold>
           {progressGlyph(progress.done, progress.total)} {clip(plan.title, Math.max(8, columns - 14))}
@@ -126,6 +159,12 @@ export function PlanPane({ kit, plan, path, columns, evidence }: { kit: Kit; pla
           {progress.done}/{progress.total}
         </Text>
       </Box>
+      {strip !== '' && (
+        <Text wrap="truncate-end">
+          {'  '}
+          {strip}
+        </Text>
+      )}
       <Text dimColor wrap="truncate-start">
         {'  '}
         {path}
@@ -169,11 +208,13 @@ export function PlanPane({ kit, plan, path, columns, evidence }: { kit: Kit; pla
               {phase.items.map(item => {
                 const glyph = glyphOf(item)
                 const isResume = item === progress.resume
+                const failStreak = isResume ? failStreakOf(item, evidence.ledger) : 0
                 return (
                   <Box key={item.text} paddingLeft={4}>
                     <Text color={isResume ? 'cyan' : GLYPH_COLOR[glyph]} dimColor={glyph === '✓'} wrap="wrap">
                       {glyph}  {item.command ?? item.text}
                       {isResume ? '   ← now' : ''}
+                      {failStreak >= 2 ? ` · failed ${failStreak}×` : ''}
                     </Text>
                   </Box>
                 )
@@ -192,7 +233,7 @@ export function PlanPane({ kit, plan, path, columns, evidence }: { kit: Kit; pla
         ))}
         {lastRun !== undefined && (
           <Text dimColor>
-            {' · '}last {lastRun.isOk ? '✓' : '✗'} {ageOf(evidence.now - lastRun.at)} ago
+            {' · '}last run {ageOf(evidence.now - lastRun.at)} ago
           </Text>
         )}
       </Box>
@@ -209,8 +250,12 @@ function pinsText({ kinds, isPaneShown }: BandPins): string {
   return `${count}: ${kinds.map(kind => kind.replace(/ View$/u, '')).join(', ')} · /thoughts to view`
 }
 
-export function bandText(plan: Plan | undefined, pins: BandPins, evidence: Evidence): string | null {
+const SEPARATOR = ' · '
+
+/** The strip takes whatever room the band's other parts leave; it collapses per phase, then drops out, before anything else is cut. */
+export function bandText(plan: Plan | undefined, pins: BandPins, evidence: Evidence, columns: number): string | null {
   const parts: string[] = []
+  let stripAt = -1
   if (plan !== undefined) {
     const progress = progressOf(plan)
     const lastRun = evidence.ledger.at(-1)
@@ -219,8 +264,15 @@ export function bandText(plan: Plan | undefined, pins: BandPins, evidence: Evide
       parts.push(progress.current.layer === null ? shortName(progress.current) : `${shortName(progress.current)} ${progress.current.layer}`)
     }
     parts.push(`${progress.done}/${progress.total}`)
-    if (lastRun !== undefined) parts.push(`${lastRun.isOk ? '✓' : '✗'} ${ageOf(evidence.now - lastRun.at)}`)
+    stripAt = parts.length
+    if (lastRun !== undefined) parts.push(`${ageOf(evidence.now - lastRun.at)} ago`)
   }
   if (pins.kinds.length > 0) parts.push(pinsText(pins))
-  return parts.length === 0 ? null : parts.join(' · ')
+  if (parts.length === 0) return null
+  if (plan !== undefined) {
+    const glyphOf = (item: PlanItem) => glyphFor(item, evidence.ledger, evidence.editSeq, evidence.baselineTicks)
+    const strip = stripText(stripOf(plan, glyphOf, columns - parts.join(SEPARATOR).length - SEPARATOR.length))
+    if (strip !== '') parts.splice(stripAt, 0, strip)
+  }
+  return parts.join(SEPARATOR)
 }

@@ -5,6 +5,8 @@ export type ThoughtsPin = {
   targetHash: string | null
   isTargetChanged: boolean
   pinnedAt: number
+  /** Set by hand with the fold toggle; absent, the newest pin is open and older ones fold. */
+  fold?: 'open' | 'closed'
 }
 
 export type ThoughtsRun = { command: string; isOk: boolean; at: number; editSeq: number }

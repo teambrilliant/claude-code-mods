@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { extractViews, hashText, pinViews, shrinkPinned } from '../hooks/views'
+import type { ThoughtsPin } from '../types'
 import { REPLIES } from './fixtures/fixtures.gen'
 
 const reply = (name: string) => REPLIES[name] ?? ''
@@ -86,6 +87,16 @@ describe('pinViews', () => {
       ['Strategic View', 1],
       ['Product View', 2],
     ])
+  })
+
+  test('a hand-set fold survives views of other kinds; a new view of the same kind resets it', async () => {
+    const [product, strategic] = extractViews(reply('multi'))
+    const first = pinViews([], [product, strategic].flatMap(view => (view === undefined ? [] : [view])), 1, () => null)
+    const opened = first.map((pin): ThoughtsPin => (pin.kind === 'Product View' ? { ...pin, fold: 'open' } : pin))
+    const withShaped = pinViews(opened, extractViews(reply('shaping-work')), 2, () => null)
+    expect(withShaped.find(pin => pin.kind === 'Product View')?.fold).toBe('open')
+    const replaced = pinViews(withShaped, extractViews(reply('product-thinker')), 3, () => null)
+    expect(replaced.find(pin => pin.kind === 'Product View')?.fold).toBeUndefined()
   })
 
   test('a file target is hashed at pin time', async () => {

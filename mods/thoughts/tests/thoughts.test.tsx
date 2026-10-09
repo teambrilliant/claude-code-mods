@@ -50,6 +50,20 @@ describe('pinned views', () => {
     expect(await textOf(message)).toContain('- Expand-contract, not a flag')
   })
 
+  test('▸ opens an older pin alongside the newest; ▾ folds the newest', async ($, on) => {
+    mock.clock(on)
+    world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])
+    await start($)
+    const pane = await mountPane($)
+    const labelOf = async (kind: string) => (await pane.find({ key: `f-${kind}` }))?.props.label
+    expect([await labelOf('Strategic View'), await labelOf('Product View')]).toEqual(['▾', '▸'])
+    await pane.press({ key: 'f-Product View' })
+    expect([await labelOf('Strategic View'), await labelOf('Product View')]).toEqual(['▾', '▾'])
+    expect((await pane.find({ key: 'body-Product View' }))?.text).toContain('Build it: the pain is real')
+    await pane.press({ key: 'f-Strategic View' })
+    expect([await labelOf('Strategic View'), await labelOf('Product View')]).toEqual(['▸', '▾'])
+  })
+
   test('while the pane is not shown, pinned blocks draw in full', async ($, on) => {
     mock.clock(on)
     const w: World = world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])
@@ -145,6 +159,68 @@ describe('plan view', () => {
     expect(pane.match(/●/g)?.length).toBeGreaterThanOrEqual(5)
   })
 
+  test('the strip shows every check in the band and the card, phases two spaces apart', async ($, on) => {
+    mock.clock(on)
+    world(on, new Map([['thoughts/plans/billing.md', PLANS.midrun]]))
+    on('tool.call', () => ({ result: { type: 'text' }, text: 'ok' }))
+    await start($)
+    await $.tool.call({ tool: 'Read', file_path: 'thoughts/plans/billing.md' })
+    expect(await textOf(await mountBand($))).toMatch(/3\/7 · ▖▖  ▖▁  ▁  ▁▁$/)
+    expect(await textOf(await mountPane($))).toContain('\n  ▖▖  ▖▁  ▁  ▁▁\n')
+  })
+
+  test('a failing check makes the border heavy and counts the failures in a row', async ($, on) => {
+    mock.clock(on)
+    world(on, new Map([['thoughts/plans/billing.md', PLANS.midrun]]))
+    on('tool.call', ($, e) => (e.tool === 'Bash' ? { isError: true, result: 'Exit code 1', text: 'Exit code 1' } : { result: { type: 'text' }, text: 'ok' }))
+    await start($)
+    await $.tool.call({ tool: 'Read', file_path: 'thoughts/plans/billing.md' })
+    const pane = await mountPane($)
+    const borderOf = async () => (await pane.find({ key: 'plan-card' }))?.props.borderStyle
+    expect(await borderOf()).toBe('round')
+    await $.tool.call({ tool: 'Bash', command: 'pnpm vitest sync-replay.test.ts' })
+    expect(await borderOf()).toBe('bold')
+    expect(await textOf(pane)).not.toContain('failed')
+    await $.tool.call({ tool: 'Bash', command: 'pnpm vitest sync-replay.test.ts' })
+    expect(await textOf(pane)).toContain('← now · failed 2×')
+  })
+
+  test('a failing run that is no plan check raises no alarm anywhere', async ($, on) => {
+    mock.clock(on)
+    world(on, new Map([['thoughts/plans/billing.md', PLANS.midrun]]))
+    on('tool.call', ($, e) => (e.tool === 'Bash' ? { isError: true, result: 'Exit code 1', text: 'Exit code 1' } : { result: { type: 'text' }, text: 'ok' }))
+    await start($)
+    await $.tool.call({ tool: 'Read', file_path: 'thoughts/plans/billing.md' })
+    await $.tool.call({ tool: 'Bash', command: 'rg nope' })
+    const pane = await mountPane($)
+    expect((await pane.find({ key: 'plan-card' }))?.props.borderStyle).toBe('round')
+    expect(await textOf(pane)).not.toContain('✗')
+    expect(await textOf(pane)).toContain('last run 0s ago')
+    expect(await textOf(await mountBand($))).not.toContain('✗')
+  })
+
+  test('a real run: early checks go stale under later edits, and a fresh Final Verification still proves it done', async ($, on) => {
+    mock.clock(on)
+    const path = 'thoughts/plans/real.md'
+    const planText = `${PLANS.tick}\n## Final Verification\n\n- [ ] \`bun test\` → pass\n`
+    const files = new Map([[path, planText]])
+    world(on, files)
+    on('tool.call', () => ({ result: { type: 'text' }, text: 'ok' }))
+    await start($)
+    await $.tool.call({ tool: 'Read', file_path: path })
+    for (const command of ['test -f notes.txt', 'grep -q one notes.txt']) await $.tool.call({ tool: 'Bash', command })
+    await $.tool.call({ tool: 'Edit', file_path: 'src/x.ts', old_string: 'a', new_string: 'b' })
+    for (const command of ['grep -q two notes.txt', `test "$(wc -l < notes.txt | tr -d ' ')" = 2`]) await $.tool.call({ tool: 'Bash', command })
+    files.set(path, planText.replaceAll('- [ ]', '- [x]'))
+    await $.tool.call({ tool: 'Edit', file_path: path, old_string: '- [ ]', new_string: '- [x]' })
+    const pane = await mountPane($)
+    const borderOf = async () => (await pane.find({ key: 'plan-card' }))?.props.borderStyle
+    expect(await borderOf()).toBe('round')
+    await $.tool.call({ tool: 'Bash', command: 'bun test' })
+    expect(await borderOf()).toBe('double')
+    expect(await textOf(pane)).toContain('◌')
+  })
+
   test('a passing run → ●, an edit after it → ◌, a failing run → ✗', async ($, on) => {
     mock.clock(on)
     const files = new Map([['thoughts/plans/billing.md', PLANS.midrun]])
@@ -156,7 +232,7 @@ describe('plan view', () => {
     await $.tool.call({ tool: 'Bash', command: 'pnpm vitest sync-invoices.test.ts' })
     const pane = await mountPane($)
     expect(await textOf(pane)).toContain('●  pnpm vitest sync-invoices.test.ts')
-    expect(await textOf(await mountBand($))).toMatch(/ · ✓ 0s$/)
+    expect(await textOf(await mountBand($))).toMatch(/ · 0s ago$/)
     await $.tool.call({ tool: 'Edit', file_path: 'src/sync.ts', old_string: 'a', new_string: 'b' })
     expect(await textOf(pane)).toContain('◌  pnpm vitest sync-invoices.test.ts')
     isFailing = true

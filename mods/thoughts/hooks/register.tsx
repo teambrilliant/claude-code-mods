@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import { recordRun } from './evidence'
 import { parsePlan, ticksOf } from './plan'
-import { PinnedPane, PlanPane, bandText } from './ui'
+import { PinnedPane, PlanPane, bandText, isOpen } from './ui'
 import type { Evidence } from './ui'
 import { extractViews, hashText, pinViews, shrinkPinned } from './views'
 import type { View } from './views'
@@ -215,6 +215,10 @@ export const register: Register = on => {
           actions: {
             discard: kind => void update($, pins, current => current.filter(pin => pin.kind !== kind)),
             reExplain: target => void $.prompt.fill({ text: `/dev-skills:explain ${target}` }),
+            toggle: kind =>
+              void update($, pins, current =>
+                current.map((pin, at) => (pin.kind === kind ? { ...pin, fold: isOpen(pin, at === current.length - 1) ? 'closed' : 'open' } : pin)),
+              ),
           },
         })}
       </Box>
@@ -224,7 +228,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const text = await read($, planText)
     const bandPins = { kinds: (await read($, pins)).map(pin => pin.kind), isPaneShown: await read($, isPaneShown) }
-    const line = bandText(text === null ? undefined : parsePlan(text), bandPins, await evidenceOf($))
+    const line = bandText(text === null ? undefined : parsePlan(text), bandPins, await evidenceOf($), e.props.bodyColumns)
     if (line === null) return next(e)
     const { Text } = $.ui.resolve(e)
     return (
