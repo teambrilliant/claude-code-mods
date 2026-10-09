@@ -127,10 +127,10 @@ export const register: Register = on => {
     if (planArg !== undefined) {
       await loadPlan($, planArg)
       const plan = await read($, planText)
-      return { text: plan === null ? `thoughts: can't read ${planArg}` : `thoughts: tracking ${planArg}` }
+      return { text: plan === null ? `can't read ${planArg}` : `tracking ${planArg}` }
     }
     await openPane($)
-    return { text: 'thoughts: pane open.' }
+    return { text: 'pane open.' }
   })
 
   on('ui.open', async ($, e, next) => {
