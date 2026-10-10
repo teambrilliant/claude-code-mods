@@ -127,6 +127,17 @@ describe('band', () => {
     expect(await bandTextOf(band)).toBe('★ 2 pinned: Product, Strategic')
   })
 
+  test('pane behind another tab: a press closes and opens it again, since only a fresh open is shown', async ($, on) => {
+    mock.clock(on)
+    const w = world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])
+    w.hidden.add('thoughts')
+    await start($)
+    const band = await mountBand($)
+    await band.press({ key: 'toggle-pane' })
+    expect(w.closed).toEqual(['thoughts'])
+    expect(w.placed.has('thoughts')).toBe(true)
+  })
+
   test('stacks its line under what other mods draw, never replaces it', async ($, on) => {
     mock.clock(on)
     world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])

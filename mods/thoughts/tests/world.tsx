@@ -1,12 +1,13 @@
 import type { On } from 'claude-code'
 
-export type World = { placed: Set<string>; hidden: Set<string>; filled: string[]; files: Map<string, string> }
+export type World = { placed: Set<string>; hidden: Set<string>; closed: string[]; filled: string[]; files: Map<string, string> }
 
 /** The world beneath the mod in a test: a session, a command table, panes that place, files from a map. */
 export function world(on: On, files: Map<string, string> = new Map(), messages: { role: 'user' | 'assistant'; text: string }[] = []): World {
   const placed = new Set<string>()
   const hidden = new Set<string>()
   const filled: string[] = []
+  const closed: string[] = []
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.root', () => ({ value: '/work' }))
@@ -17,6 +18,7 @@ export function world(on: On, files: Map<string, string> = new Map(), messages: 
   })
   on('ui.close', ($, e) => {
     placed.delete(e.id)
+    closed.push(e.id)
     return { value: undefined }
   })
   on('ui.panes', () => ({
@@ -36,5 +38,5 @@ export function world(on: On, files: Map<string, string> = new Map(), messages: 
     const props: object = e.props
     return <Text>{e.component === 'AbovePrompt' ? 'BELOW' : 'text' in props ? String(props.text) : ''}</Text>
   })
-  return { placed, hidden, filled, files }
+  return { placed, hidden, closed, filled, files }
 }

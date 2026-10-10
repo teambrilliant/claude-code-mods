@@ -61,6 +61,12 @@ async function closePane($: EngineInterface) {
   await refreshPaneShown($)
 }
 
+/** Re-opening an open id leaves it behind another pane's tab; only a fresh open is shown. */
+async function raisePane($: EngineInterface) {
+  if ((await $.ui.panes()).some(pane => pane.id === PANE)) await $.ui.close({ id: PANE })
+  await openPane($)
+}
+
 async function refreshPaneShown($: EngineInterface) {
   const isShown = (await $.ui.panes()).some(pane => pane.id === PANE && pane.isPlaced && pane.isShown)
   await update($, isPaneShown, () => isShown)
@@ -242,7 +248,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         {below}
-        <Button key="toggle-pane" hotkey="t" plain onPress={() => void (bandPins.isPaneShown ? closePane($) : openPane($))}>
+        <Button key="toggle-pane" hotkey="t" plain onPress={() => void (bandPins.isPaneShown ? closePane($) : raisePane($))}>
           <Text dimColor wrap="truncate-end">
             {line}
           </Text>
