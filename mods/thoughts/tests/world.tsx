@@ -34,7 +34,7 @@ export function world(on: On, files: Map<string, string> = new Map(), messages: 
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
     const props: object = e.props
-    return <Text>{'text' in props ? String(props.text) : ''}</Text>
+    return <Text>{e.component === 'AbovePrompt' ? 'BELOW' : 'text' in props ? String(props.text) : ''}</Text>
   })
   return { placed, hidden, filled, files }
 }

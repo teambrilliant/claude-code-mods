@@ -18,3 +18,4 @@ One plugin per folder in `mods/<name>/`: `.claude-plugin/plugin.json`, `hooks/ho
 - The kit can't answer `session.append` (it requires `next`, and nothing sits beneath it in a test), so test the logic behind that hook through another entry point.
 - If the kit says hooks modules are turned off ("rollout switch"), run it once with network access.
 - Bump a mod's `plugin.json` version on behavioral changes.
+- Band (`AbovePrompt`) hooks always `await next(e)` and stack their line with it, never return a tree in its place: one mod that doesn't call `next` hides every band beneath it, other people's mods included.

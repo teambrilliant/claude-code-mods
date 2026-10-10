@@ -22,6 +22,9 @@ const mountMessage = ($: Engine, text: string) =>
 
 const textOf = async (ui: { findAll: (q: { type: 'Text' }) => Promise<{ text?: string }[]> }) =>
   (await ui.findAll({ type: 'Text' })).map(found => found.text ?? '').join('\n')
+/** The band's own lines: what other mods draw beneath it (`BELOW` in the world) left out. */
+const bandTextOf = async (ui: { findAll: (q: { type: 'Text' }) => Promise<{ text?: string }[]> }) =>
+  (await textOf(ui)).split('\n').filter(line => line !== 'BELOW').join('\n')
 
 describe('pinned views', () => {
   test('views in the transcript are pinned at session start; same kind replaces; newest shows first', async ($, on) => {
@@ -105,7 +108,7 @@ describe('band', () => {
     const w = world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])
     w.hidden.add('thoughts')
     await start($)
-    expect(await textOf(await mountBand($))).toBe('★ 2 pinned: Product, Strategic')
+    expect(await bandTextOf(await mountBand($))).toBe('★ 2 pinned: Product, Strategic')
   })
 
   test('the band is a toggle (t, or a click): one press opens the pane, the same press closes it', async ($, on) => {
@@ -118,17 +121,24 @@ describe('band', () => {
     w.hidden.delete('thoughts')
     await band.press({ key: 'toggle-pane' })
     expect(w.placed.has('thoughts')).toBe(true)
-    expect(await textOf(band)).toBe('★ 2 pinned')
+    expect(await bandTextOf(band)).toBe('★ 2 pinned')
     await band.press({ key: 'toggle-pane' })
     expect(w.placed.has('thoughts')).toBe(false)
-    expect(await textOf(band)).toBe('★ 2 pinned: Product, Strategic')
+    expect(await bandTextOf(band)).toBe('★ 2 pinned: Product, Strategic')
+  })
+
+  test('stacks its line under what other mods draw, never replaces it', async ($, on) => {
+    mock.clock(on)
+    world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])
+    await start($)
+    expect(await textOf(await mountBand($))).toBe('BELOW\n★ 2 pinned')
   })
 
   test('pins shown in the pane: just the count', async ($, on) => {
     mock.clock(on)
     world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])
     await start($)
-    expect(await textOf(await mountBand($))).toBe('★ 2 pinned')
+    expect(await bandTextOf(await mountBand($))).toBe('★ 2 pinned')
   })
 })
 
@@ -137,7 +147,7 @@ describe('plan view', () => {
     mock.clock(on)
     world(on)
     await start($)
-    expect(await textOf(await mountBand($))).toBe('')
+    expect(await bandTextOf(await mountBand($))).toBe('')
   })
 
   test('reading a plan makes it active: band and pane show progress; prior ticks read as done earlier', async ($, on) => {
@@ -146,7 +156,7 @@ describe('plan view', () => {
     on('tool.call', () => ({ result: { type: 'text' }, text: 'ok' }))
     await start($)
     await $.tool.call({ tool: 'Read', file_path: 'thoughts/plans/billing.md' })
-    expect(await textOf(await mountBand($))).toMatch(/^◑ Billing invoices · P2 Function · 3\/7/)
+    expect(await bandTextOf(await mountBand($))).toMatch(/^◑ Billing invoices · P2 Function · 3\/7/)
     const pane = await textOf(await mountPane($))
     expect(pane).toContain('✓ Stripe client + table')
     expect(pane).toContain('▾ syncInvoices')
@@ -181,7 +191,7 @@ describe('plan view', () => {
     on('tool.call', () => ({ result: { type: 'text' }, text: 'ok' }))
     await start($)
     await $.tool.call({ tool: 'Read', file_path: 'thoughts/plans/billing.md' })
-    expect(await textOf(await mountBand($))).toMatch(/3\/7 · ▖▖  ▖▁  ▁  ▁▁$/)
+    expect(await bandTextOf(await mountBand($))).toMatch(/3\/7 · ▖▖  ▖▁  ▁  ▁▁$/)
     expect(await textOf(await mountPane($))).toContain('\n  ▖▖  ▖▁  ▁  ▁▁\n')
   })
 
@@ -212,7 +222,7 @@ describe('plan view', () => {
     expect((await pane.find({ key: 'plan-card' }))?.props.borderStyle).toBe('round')
     expect(await textOf(pane)).not.toContain('✗')
     expect(await textOf(pane)).toContain('last run 0s ago')
-    expect(await textOf(await mountBand($))).not.toContain('✗')
+    expect(await bandTextOf(await mountBand($))).not.toContain('✗')
   })
 
   test('a real run: early checks go stale under later edits, and a fresh Final Verification still proves it done', async ($, on) => {
@@ -248,7 +258,7 @@ describe('plan view', () => {
     await $.tool.call({ tool: 'Bash', command: 'pnpm vitest sync-invoices.test.ts' })
     const pane = await mountPane($)
     expect(await textOf(pane)).toContain('●  pnpm vitest sync-invoices.test.ts')
-    expect(await textOf(await mountBand($))).toMatch(/ · 0s ago$/)
+    expect(await bandTextOf(await mountBand($))).toMatch(/ · 0s ago$/)
     await $.tool.call({ tool: 'Edit', file_path: 'src/sync.ts', old_string: 'a', new_string: 'b' })
     expect(await textOf(pane)).toContain('◌  pnpm vitest sync-invoices.test.ts')
     isFailing = true

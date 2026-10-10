@@ -236,14 +236,18 @@ export const register: Register = on => {
     const text = await read($, planText)
     const bandPins = { kinds: (await read($, pins)).map(pin => pin.kind), isPaneShown: await read($, isPaneShown) }
     const line = bandText(text === null ? undefined : parsePlan(text), bandPins, await evidenceOf($), e.props.bodyColumns - TOGGLE_HOTKEY_CELLS)
-    if (line === null) return next(e)
-    const { Button, Text } = $.ui.resolve(e)
+    const below = await next(e)
+    if (line === null) return below
+    const { Box, Button, Text } = $.ui.resolve(e)
     return (
-      <Button key="toggle-pane" hotkey="t" plain onPress={() => void (bandPins.isPaneShown ? closePane($) : openPane($))}>
-        <Text dimColor wrap="truncate-end">
-          {line}
-        </Text>
-      </Button>
+      <Box flexDirection="column">
+        {below}
+        <Button key="toggle-pane" hotkey="t" plain onPress={() => void (bandPins.isPaneShown ? closePane($) : openPane($))}>
+          <Text dimColor wrap="truncate-end">
+            {line}
+          </Text>
+        </Button>
+      </Box>
     )
   })
 }
