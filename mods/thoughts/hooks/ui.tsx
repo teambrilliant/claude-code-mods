@@ -243,11 +243,11 @@ export function PlanPane({ kit, plan, path, columns, evidence }: { kit: Kit; pla
 
 export type BandPins = { kinds: readonly string[]; isPaneShown: boolean }
 
-/** `★ 2 pinned: Strategic, Product · /thoughts to view` while the pane is hidden; just the count while it shows them. */
+/** `★ 2 pinned: Strategic, Product` while the pane is hidden; just the count while it shows them. */
 function pinsText({ kinds, isPaneShown }: BandPins): string {
   const count = `★ ${kinds.length} pinned`
   if (isPaneShown) return count
-  return `${count}: ${kinds.map(kind => kind.replace(/ View$/u, '')).join(', ')} · /thoughts to view`
+  return `${count}: ${kinds.map(kind => kind.replace(/ View$/u, '')).join(', ')}`
 }
 
 const SEPARATOR = ' · '

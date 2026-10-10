@@ -15,6 +15,10 @@ export function world(on: On, files: Map<string, string> = new Map(), messages: 
     placed.add(e.id)
     return { value: { isPlaced: true } }
   })
+  on('ui.close', ($, e) => {
+    placed.delete(e.id)
+    return { value: undefined }
+  })
   on('ui.panes', () => ({
     value: [...placed].map(id => ({ id, title: id, isShown: !hidden.has(id), isFocused: false, isPlaced: true })),
   }))

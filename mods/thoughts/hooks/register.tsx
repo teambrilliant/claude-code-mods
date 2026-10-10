@@ -11,6 +11,8 @@ import type { View } from './views'
 const PANE = 'thoughts'
 const PLAN_PATH = /(^|\/)thoughts\/plans\/[^/]+\.md$/u
 const OUTSIDE_THOUGHTS = (path: string) => !/(^|\/)thoughts\//u.test(path)
+/** `t: ` the engine draws before a plain Button with a hotkey. */
+const TOGGLE_HOTKEY_CELLS = 3
 
 const pins = atom({ plugin: 'thoughts', key: 'pins' }, [])
 const isPaneShown = atom({ plugin: 'thoughts', key: 'isPaneShown' }, false)
@@ -51,6 +53,11 @@ async function pinAll($: EngineInterface, views: readonly View[]) {
 /** Opened unasked (first pin) it may wait undrawn on a narrow terminal; shrinking follows what's actually on screen. */
 async function openPane($: EngineInterface) {
   await $.ui.open({ id: PANE, title: 'thoughts' })
+  await refreshPaneShown($)
+}
+
+async function closePane($: EngineInterface) {
+  await $.ui.close({ id: PANE })
   await refreshPaneShown($)
 }
 
@@ -228,13 +235,15 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const text = await read($, planText)
     const bandPins = { kinds: (await read($, pins)).map(pin => pin.kind), isPaneShown: await read($, isPaneShown) }
-    const line = bandText(text === null ? undefined : parsePlan(text), bandPins, await evidenceOf($), e.props.bodyColumns)
+    const line = bandText(text === null ? undefined : parsePlan(text), bandPins, await evidenceOf($), e.props.bodyColumns - TOGGLE_HOTKEY_CELLS)
     if (line === null) return next(e)
-    const { Text } = $.ui.resolve(e)
+    const { Button, Text } = $.ui.resolve(e)
     return (
-      <Text dimColor wrap="truncate-end">
-        {line}
-      </Text>
+      <Button key="toggle-pane" hotkey="t" plain onPress={() => void (bandPins.isPaneShown ? closePane($) : openPane($))}>
+        <Text dimColor wrap="truncate-end">
+          {line}
+        </Text>
+      </Button>
     )
   })
 }

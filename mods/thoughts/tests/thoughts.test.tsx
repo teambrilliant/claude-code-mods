@@ -105,7 +105,23 @@ describe('band', () => {
     const w = world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])
     w.hidden.add('thoughts')
     await start($)
-    expect(await textOf(await mountBand($))).toBe('★ 2 pinned: Product, Strategic · /thoughts to view')
+    expect(await textOf(await mountBand($))).toBe('★ 2 pinned: Product, Strategic')
+  })
+
+  test('the band is a toggle (t, or a click): one press opens the pane, the same press closes it', async ($, on) => {
+    mock.clock(on)
+    const w = world(on, new Map(), [{ role: 'assistant', text: reply('multi') }])
+    w.hidden.add('thoughts')
+    await start($)
+    const band = await mountBand($)
+    expect((await band.find({ key: 'toggle-pane' }))?.props.hotkey).toBe('t')
+    w.hidden.delete('thoughts')
+    await band.press({ key: 'toggle-pane' })
+    expect(w.placed.has('thoughts')).toBe(true)
+    expect(await textOf(band)).toBe('★ 2 pinned')
+    await band.press({ key: 'toggle-pane' })
+    expect(w.placed.has('thoughts')).toBe(false)
+    expect(await textOf(band)).toBe('★ 2 pinned: Product, Strategic')
   })
 
   test('pins shown in the pane: just the count', async ($, on) => {

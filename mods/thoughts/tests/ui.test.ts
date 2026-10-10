@@ -74,6 +74,6 @@ describe('bandText', () => {
 
   test('too narrow even per phase: no strip, the pins notice stays whole', async () => {
     const line = bandText(parsePlan(PLANS.midrun), { kinds: ['Product View'], isPaneShown: false }, evidence, 50)
-    expect(line).toBe('◑ Billing invoices · P2 Function · 3/7 · ★ 1 pinned: Product · /thoughts to view')
+    expect(line).toBe('◑ Billing invoices · P2 Function · 3/7 · ★ 1 pinned: Product')
   })
 })
