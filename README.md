@@ -1,5 +1,7 @@
 # claude-code-mods
 
+> **Deprecated.** The `thoughts` mod moved to [teambrilliant/tap](https://github.com/teambrilliant/tap) as the `tap-pane` plugin. This repo is archived and no longer updated. Install: `/plugin install tap-pane@teambrilliant-marketplace`.
+
 Claude Code mods by Team Brilliant. A mod is a plugin that hooks into Claude Code's events and UI: it can draw a pane, rewrite how a message renders, or react to tool calls. The mods API is early access, and mods run in Claude Code only.
 
 ## Install
